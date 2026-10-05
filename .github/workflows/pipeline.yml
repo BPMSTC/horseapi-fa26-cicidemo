@@ -1,17 +1,19 @@
-name: Build, test, and deploy
+name: Build, test, and deploy (simulated)
 
-# ACT 2 of the demo. Copy this file to .github/workflows/pipeline.yml.
-# Same shape as the page 4 tutorial sample, with the AWS steps replaced by a simulated deploy.
+# This workflow is the finished pipeline for the Week 7 demo.
+# Pull requests build and test only. Pushes to main build, test, and then "deploy".
+# The deploy is SIMULATED: it prints what it would do and never touches AWS.
+# See docs/PIPELINE-WALKTHROUGH.md for a line-by-line explanation.
 
 # Events that start this workflow.
 on:
-  pull_request:            # PRs into main: build and test only (deploy is skipped by the if: below)
+  pull_request:            # a PR into main: build and test only (deploy is skipped by the if: below)
     branches: [ main ]
-  push:                    # merges/pushes to main: build, test, then deploy
+  push:                    # a push or merge to main: build, test, then deploy
     branches: [ main ]
-  workflow_dispatch:       # manual "Run workflow" button
+  workflow_dispatch:       # a manual "Run workflow" button on the Actions tab
 
-# Default token permissions for every job: read the repo, nothing else.
+# Default token permissions for every job: read the repository, nothing else.
 permissions:
   contents: read
 
@@ -20,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest                      # a fresh Linux virtual machine for this job
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4               # copy the repo onto the runner
+        uses: actions/checkout@v4               # copy the repository onto the runner
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
@@ -33,8 +35,8 @@ jobs:
       - name: Build
         run: dotnet build Wp1Fall26Aws.slnx --configuration Release --no-restore
 
-      - name: Test                               # THE GATE: a failing test fails this job
-        run: dotnet test Wp1Fall26Aws.slnx --configuration Release --no-build
+      - name: Run unit and integration tests     # THE GATE: a failing test fails this job
+        run: dotnet test Wp1Fall26Aws.slnx --configuration Release --no-build --logger "console;verbosity=normal"
 
       - name: Publish the API
         run: dotnet publish src/Wp1Fall26Aws.Api/Wp1Fall26Aws.Api.csproj --configuration Release --no-build --output ./publish
