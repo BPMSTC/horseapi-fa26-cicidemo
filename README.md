@@ -4,6 +4,7 @@ A working CI/CD pipeline for the Web Programming 1 (Week 7) demo.
 
 Every push to `main` builds the app, runs its unit and integration tests, and only then "deploys" it. Pull requests build and test but never deploy. The deploy is **simulated**: it prints what it would do and never touches AWS, so the repo is safe to push to at any time.
 
+
 ## What the pipeline does
 
 ```
@@ -18,14 +19,14 @@ Push or merge to main:    build-test  -->  deploy (simulated)
 
 Read them in this order:
 
-| File | What it covers |
-|---|---|
-| [docs/SETUP.md](docs/SETUP.md) | One-time setup, running the tests locally, and a plain-language Git glossary |
-| [docs/PIPELINE-WALKTHROUGH.md](docs/PIPELINE-WALKTHROUGH.md) | The workflow file explained block by block |
-| [docs/TESTING.md](docs/TESTING.md) | The 8 tests, what each one proves, and how the S3 spy works |
+| File                                                                | What it covers                                                                      |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [docs/SETUP.md](docs/SETUP.md)                                       | One-time setup, running the tests locally, and a plain-language Git glossary        |
+| [docs/PIPELINE-WALKTHROUGH.md](docs/PIPELINE-WALKTHROUGH.md)         | The workflow file explained block by block                                          |
+| [docs/TESTING.md](docs/TESTING.md)                                   | The 8 tests, what each one proves, and how the S3 spy works                         |
 | [docs/SECURITY-IN-THE-PIPELINE.md](docs/SECURITY-IN-THE-PIPELINE.md) | The security controls already in the workflow, and what a real AWS deploy would add |
-| [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md) | Step-by-step script for presenting and reproducing the demo |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | What to check when something doesn't work |
+| [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md)                           | Step-by-step script for presenting and reproducing the demo                         |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)                   | What to check when something doesn't work                                           |
 
 ## The app
 
