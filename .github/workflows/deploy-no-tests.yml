@@ -1,0 +1,59 @@
+name: Deploy (no tests)
+
+# ACT 1 of the demo. This mirrors our real deploy workflow: it publishes and "deploys"
+# on every push to main, and it NEVER runs the tests. The AWS steps are replaced by a
+# simulated deploy so nothing real is touched.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:       # manual "Run workflow" button
+
+permissions:
+  id-token: write          # lets this job request an OIDC token (used by the debug step below)
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish the API              # note: no restore/build/test step anywhere in this workflow
+        run: dotnet publish ./src/Wp1Fall26Aws.Api/Wp1Fall26Aws.Api.csproj -c Release -o ./publish
+
+      - name: Create ZIP deployment bundle
+        run: |
+          cd ./publish
+          zip -r ../deploy-package.zip .
+
+      - name: Show the OIDC claims GitHub would send to AWS
+        run: |
+          # Ask GitHub's token service for an OIDC token for the AWS audience.
+          RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+          TOKEN=$(echo "$RESPONSE" | jq -r '.value')
+
+          # A token is three dot-separated parts; the middle part holds the claims.
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
+          # base64url -> base64, then re-pad to a multiple of 4 so base64 -d does not truncate.
+          PAYLOAD=$(echo "$PAYLOAD" | tr '_-' '/+')
+          while [ $(( ${#PAYLOAD} % 4 )) -ne 0 ]; do PAYLOAD="${PAYLOAD}="; done
+
+          echo "=== OIDC CLAIMS (the token itself is never printed) ==="
+          echo "$PAYLOAD" | base64 -d 2>/dev/null | jq '{aud, iss, sub, repository, repository_owner, ref}'
+
+      - name: SIMULATED deploy (no AWS involved)
+        run: |
+          echo "SIMULATED DEPLOY: would send deploy-package.zip to Elastic Beanstalk as version deploy-${{ github.sha }}"
+          unzip -l deploy-package.zip | tail -n 5
+          echo "### Simulated deploy: SHIPPED" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version \`deploy-${{ github.sha }}\` was 'deployed'. **No tests were run.**" >> "$GITHUB_STEP_SUMMARY"

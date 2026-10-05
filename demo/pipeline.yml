@@ -1,0 +1,88 @@
+name: Build, test, and deploy
+
+# ACT 2 of the demo. Copy this file to .github/workflows/pipeline.yml.
+# Same shape as the page 4 tutorial sample, with the AWS steps replaced by a simulated deploy.
+
+# Events that start this workflow.
+on:
+  pull_request:            # PRs into main: build and test only (deploy is skipped by the if: below)
+    branches: [ main ]
+  push:                    # merges/pushes to main: build, test, then deploy
+    branches: [ main ]
+  workflow_dispatch:       # manual "Run workflow" button
+
+# Default token permissions for every job: read the repo, nothing else.
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest                      # a fresh Linux virtual machine for this job
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4               # copy the repo onto the runner
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore packages
+        run: dotnet restore Wp1Fall26Aws.slnx
+
+      - name: Build
+        run: dotnet build Wp1Fall26Aws.slnx --configuration Release --no-restore
+
+      - name: Test                               # THE GATE: a failing test fails this job
+        run: dotnet test Wp1Fall26Aws.slnx --configuration Release --no-build
+
+      - name: Publish the API
+        run: dotnet publish src/Wp1Fall26Aws.Api/Wp1Fall26Aws.Api.csproj --configuration Release --no-build --output ./publish
+
+      - name: Upload the tested build as an artifact
+        uses: actions/upload-artifact@v4         # hand the exact tested output to the deploy job
+        with:
+          name: api-publish
+          path: ./publish
+
+  deploy:
+    needs: build-test                            # wait for build-test; skipped if it fails
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'  # only from main, never from PRs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write                            # lets this job request an OIDC token (to show the claims)
+    steps:
+      - name: Download the tested build
+        uses: actions/download-artifact@v5
+        with:
+          name: api-publish
+          path: ./publish
+
+      - name: Create ZIP deployment bundle
+        run: |
+          cd ./publish
+          zip -r ../deploy-package.zip .
+
+      - name: Show the OIDC claims GitHub would send to AWS
+        run: |
+          # Ask GitHub's token service for an OIDC token for the AWS audience.
+          RESPONSE=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+          TOKEN=$(echo "$RESPONSE" | jq -r '.value')
+
+          # A token is three dot-separated parts; the middle part holds the claims.
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
+          # base64url -> base64, then re-pad to a multiple of 4 so base64 -d does not truncate.
+          PAYLOAD=$(echo "$PAYLOAD" | tr '_-' '/+')
+          while [ $(( ${#PAYLOAD} % 4 )) -ne 0 ]; do PAYLOAD="${PAYLOAD}="; done
+
+          echo "=== OIDC CLAIMS (the token itself is never printed) ==="
+          echo "$PAYLOAD" | base64 -d 2>/dev/null | jq '{aud, iss, sub, repository, repository_owner, ref}'
+
+      - name: SIMULATED deploy (no AWS involved)
+        run: |
+          echo "SIMULATED DEPLOY: would send deploy-package.zip to Elastic Beanstalk as version deploy-${{ github.sha }}"
+          unzip -l deploy-package.zip | tail -n 5
+          echo "### Simulated deploy: SHIPPED" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version \`deploy-${{ github.sha }}\` passed its tests and was 'deployed'." >> "$GITHUB_STEP_SUMMARY"
